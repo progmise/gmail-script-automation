@@ -34,12 +34,12 @@ def leer_archivo(ruta_de_archivo: str) -> 'list[str]':
     datos = []
 
     try:
-        f = open(ruta_de_archivo, "r", encoding="utf-8")
+        archivo = open(ruta_de_archivo, "r", encoding="utf-8")
     except IOError:
         print("\nNo se pudo leer el archivo: ", ruta_de_archivo)
     
-    with f:
-        datos = f.read().splitlines()
+    with archivo:
+        datos = archivo.read().splitlines()
 
     return datos
 
