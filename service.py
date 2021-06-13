@@ -390,12 +390,34 @@ def filtrar_por_fecha_manual(mensajes: 'list[str, dict]', fecha_inicio: str, fec
     return mensajes_filtrados
 
 
+def unir_mensajes_a_estudiantes(estudiantes: 'list[dict]', mensajes: 'list[dict]'):
+
+    for estudiante in estudiantes:
+
+        indice = 0
+        flag_se_agrego_mensaje = False
+
+        while not flag_se_agrego_mensaje:
+
+            if estudiante.get('legajo', 0) == mensajes[indice].get('legajo', 0):
+
+                estudiante['mensaje'] = mensajes[indice]
+                
+                del mensajes[indice]['legajo']
+
+                flag_se_agrego_mensaje = True
+
+            else:
+
+                indice += 1
+
+
 def limpiar_mensajes(mensajes: 'list[dict]') -> None:
 
     mensajes_no_unicos_por_legajo = dict()
     flag_no_hay_duplicados = False
 
-    mensajes = list(filter(lambda i: i.get('legajo', 0) != 0, mensajes))
+    mensajes[:] = list(filter(lambda i: i.get('legajo', 0) != 0, mensajes))
 
     while not flag_no_hay_duplicados:
 
@@ -502,7 +524,7 @@ def main() -> None:
     opciones = [
         "Procesar correos electrónicos de entregas y archivo de alumnos",
         "Limpiar alumnos que no realizaron entrega",
-        "Opción 3",
+        "Descargar códigos fuentes e hipotesis",
         "Opción 4",
         "Opción 5",
         "Salir"
@@ -544,6 +566,10 @@ def main() -> None:
             limpiar_mensajes(mensajes)
 
             print("\n¡Mensajes limpiados!")
+
+            unir_mensajes_a_estudiantes(estudiantes, mensajes)
+
+            print("\n¡Se relacionaron estudiantes y mensajes!")
 
         elif(opcion == 3 and flag_hay_datos):
             pass
