@@ -25,6 +25,25 @@ TIME_ZONE = 'America/Argentina/Buenos_Aires'
 FORMATO_FECHA_VALIDO = '%d/%m/%Y %H:%M:%S'
 
 
+def leer_archivo(ruta_de_archivo: str) -> 'list[str]':
+
+    # PRE: 'filepath', debe ser una variable de tipo str
+    # POST: Devuelve una lista, que representa a las lineas leidas del archivo  
+    #       que fue abierto y leido posteriormente
+
+    datos = []
+
+    try:
+        f = open(ruta_de_archivo, "r", encoding="utf-8")
+    except IOError:
+        print("\nNo se pudo leer el archivo: ", ruta_de_archivo)
+    
+    with f:
+        datos = f.read().splitlines()
+
+    return datos
+
+
 def validar_formato_fecha() -> tuple:
 
     fecha_validada = None
