@@ -303,7 +303,7 @@ def obtener_servicio() -> Resource:
     return build('gmail', 'v1', credentials=generar_credenciales())
 
 
-def obtener_encabezado(servicio: Resource, mensaje: dict, encabezado: str) -> tuple:
+def obtener_encabezado(mensaje: dict, encabezado: str) -> str:
     '''
     Encabezados válidos: 
         'Delivered-To', 'Received', 'X-Received', 'ARC-Seal', 'ARC-Message-Signature', 
@@ -313,17 +313,22 @@ def obtener_encabezado(servicio: Resource, mensaje: dict, encabezado: str) -> tu
         'From', 'Date', 'Message-ID', 'Subject', 'To', 'Content-Type'
     '''
 
-    id_mensaje = mensaje.get('id', '')
-
-    resultado = servicio.users().messages().get(userId='me', id=id_mensaje).execute()
-
-    encabezados = resultado.get('payload', '').get('headers', '')
+    encabezados = mensaje.get('payload', '').get('headers', '')
 
     encabezado = [d for d in encabezados if d.get('name', '') == encabezado]
 
     asunto = encabezado[0].get('value', '')    
 
-    return asunto, resultado
+    return asunto
+
+
+def obtener_mensaje(servicio: Resource, mensaje: dict) -> dict:
+
+    id_mensaje = mensaje.get('id', '')
+
+    resultado = servicio.users().messages().get(userId='me', id=id_mensaje).execute()    
+
+    return resultado
 
 
 def filtrar_por_fecha_manual(mensajes: 'list[str, dict]', fecha_inicio: str, fecha_hasta: str) -> 'list[dict]':
@@ -353,6 +358,29 @@ def filtrar_por_fecha_manual(mensajes: 'list[str, dict]', fecha_inicio: str, fec
             mensajes_filtrados.append(mensaje.get('mensaje', ''))
 
     return mensajes_filtrados
+
+
+def limpiar_estudiantes(mensajes: 'list[dict]', estudiantes: 'list[dict]') -> None:
+
+    asunto = ''
+    legajo = 0
+    legajos = list()
+
+    for mensaje in mensajes:
+
+        asunto = obtener_encabezado(mensaje, 'Subject')
+
+        asunto = re.sub('(\D+\d?\D)', '', asunto)
+
+        legajo = validar_numero(asunto)
+
+        legajos.append(legajo)
+
+    legajos = list(filter(lambda i: i != 0, legajos))
+
+    legajos_unicos = set(legajos)
+
+    estudiantes[:] = [i for i in estudiantes if i.get('legajo', 0) in legajos_unicos]
 
 
 def procesar_informacion_de_entrada() -> 'list[dict]':
@@ -396,8 +424,10 @@ def listar_mensajes_por_fechas(servicio: Resource, fecha_inicio: str, fecha_hast
 
     for id_mensaje in ids_mensajes:
 
-        fecha, mensaje = obtener_encabezado(servicio, id_mensaje, 'Date')
-
+        mensaje = obtener_mensaje(servicio, id_mensaje)
+        '''
+        fecha = obtener_encabezado(mensaje, 'Date')
+        '''
         mensajes.append(mensaje)
         '''
         mensajes.append({
@@ -415,8 +445,8 @@ def listar_mensajes_por_fechas(servicio: Resource, fecha_inicio: str, fecha_hast
 def main() -> None:
 
     opciones = [
-        "Procesar correos electrónicos de entregas",
-        "Opción 2",
+        "Procesar correos electrónicos de entregas y archivo de alumnos",
+        "Limpiar alumnos que no realizaron entrega",
         "Opción 3",
         "Opción 4",
         "Opción 5",
@@ -429,17 +459,17 @@ def main() -> None:
     mensajes = list()
     estudiantes = list()
     flag_hay_datos = False
-    servicio = obtener_servicio()
 
+    servicio = obtener_servicio()
     opcion = obtener_entrada_usuario(opciones)
 
     while opcion != 6:
 
         if opcion == 1:
 
-            #fecha_inicio, fecha_hasta = obtener_fechas()
+            # fecha_inicio, fecha_hasta = obtener_fechas()
 
-            # mensajes = listar_mensajes_por_fechas(servicio, '08/06/2021 18:00:00', '08/06/2021 21:00:00')
+            mensajes = listar_mensajes_por_fechas(servicio, '08/06/2021 18:00:00', '08/06/2021 21:00:00')
             # mensajes = listar_mensajes_por_fechas(servicio, fecha_inicio, fecha_hasta)
 
             print("\n¡Mensajes procesados!")
@@ -451,7 +481,10 @@ def main() -> None:
             flag_hay_datos = True
 
         elif(opcion == 2 and flag_hay_datos):
-            pass
+
+            limpiar_estudiantes(mensajes, estudiantes)
+
+            print("\n¡Estudiantes limpiados!")
 
         elif(opcion == 3 and flag_hay_datos):
             pass
