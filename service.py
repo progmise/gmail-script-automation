@@ -296,11 +296,41 @@ def generar_credenciales() -> Credentials:
     return credencial
 
 
+def eliminar_mensajes_mas_viejos(mensajes: 'list[dict]', indices: 'list[int]') -> None:
+
+    for i in range(len(indices) - 1, 0, -1):
+
+        mensajes.pop(indices[i])
+
+
 def obtener_servicio() -> Resource:
     """
     Creador de la conexion a la API Gmail
     """
     return build('gmail', 'v1', credentials=generar_credenciales())
+
+
+def obtener_duplicados_por_legajo(mensajes: 'list[dict]') -> dict:
+
+    mensajes_no_unicos_por_legajo = dict()
+    index = 0
+
+    for mensaje in mensajes:
+
+        if mensaje['legajo'] in mensajes_no_unicos_por_legajo:
+
+            mensajes_no_unicos_por_legajo[mensaje['legajo']][0] += 1
+            mensajes_no_unicos_por_legajo[mensaje['legajo']][1].append(index)
+
+        else:
+
+            mensajes_no_unicos_por_legajo[mensaje['legajo']] = [1, [index]]
+        
+        index += 1
+ 
+    mensajes_no_unicos_por_legajo = {key:value for key, value in mensajes_no_unicos_por_legajo.items() if value[0] > 1}
+
+    return mensajes_no_unicos_por_legajo
 
 
 def obtener_encabezado(mensaje: dict, encabezado: str) -> str:
@@ -360,6 +390,29 @@ def filtrar_por_fecha_manual(mensajes: 'list[str, dict]', fecha_inicio: str, fec
     return mensajes_filtrados
 
 
+def limpiar_mensajes(mensajes: 'list[dict]') -> None:
+
+    mensajes_no_unicos_por_legajo = dict()
+    flag_no_hay_duplicados = False
+
+    mensajes = list(filter(lambda i: i.get('legajo', 0) != 0, mensajes))
+
+    while not flag_no_hay_duplicados:
+
+        mensajes_no_unicos_por_legajo = obtener_duplicados_por_legajo(mensajes)
+
+        if not bool(mensajes_no_unicos_por_legajo):
+
+            flag_no_hay_duplicados = True
+
+        else:
+
+            eliminar_mensajes_mas_viejos(
+                mensajes, 
+                list(mensajes_no_unicos_por_legajo.values())[0][1]
+            )
+
+
 def limpiar_estudiantes(mensajes: 'list[dict]', estudiantes: 'list[dict]') -> None:
 
     asunto = ''
@@ -375,6 +428,8 @@ def limpiar_estudiantes(mensajes: 'list[dict]', estudiantes: 'list[dict]') -> No
         legajo = validar_numero(asunto)
 
         legajos.append(legajo)
+
+        mensaje['legajo'] = legajo
 
     legajos = list(filter(lambda i: i != 0, legajos))
 
@@ -485,6 +540,10 @@ def main() -> None:
             limpiar_estudiantes(mensajes, estudiantes)
 
             print("\n¡Estudiantes limpiados!")
+
+            limpiar_mensajes(mensajes)
+
+            print("\n¡Mensajes limpiados!")
 
         elif(opcion == 3 and flag_hay_datos):
             pass
