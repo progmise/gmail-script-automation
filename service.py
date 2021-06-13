@@ -27,16 +27,16 @@ FORMATO_FECHA_VALIDO = '%d/%m/%Y %H:%M:%S'
 
 def leer_archivo(ruta_de_archivo: str) -> 'list[str]':
 
-    # PRE: 'filepath', debe ser una variable de tipo str
+    # PRE: 'ruta_de_archivo', debe ser una variable de tipo str
     # POST: Devuelve una lista, que representa a las lineas leidas del archivo  
     #       que fue abierto y leido posteriormente
 
     datos = []
 
     try:
-        archivo = open(ruta_de_archivo, "r", encoding="utf-8")
+        archivo = open(ruta_de_archivo, 'r', encoding='utf-8')
     except IOError:
-        print("\nNo se pudo leer el archivo: ", ruta_de_archivo)
+        print('\nNo se pudo leer el archivo: ', ruta_de_archivo)
     
     with archivo:
         datos = archivo.read().splitlines()
@@ -136,6 +136,34 @@ def validar_opcion_ingresada(opciones: list) -> int:
             opcion_ingresada = input('\nIngrese una opción: ')
 
     return numero
+
+
+def convertir_dato_a_estudiante(dato: str, encabezados_de_estudiante: 'list[str]') -> dict:
+    
+    # PRE: 'dato', debe ser una variable de tipo str
+    # POST: Devuelve un dict, que representa a la información pasada por 
+    #       parámetro y que ha sido parseada al modelo 'estudiante'
+
+    # estudiante = { 
+    #   'padron': int, 
+    #   'nombre': str, 
+    #   "apellido": str
+    # }
+
+    dato_formateado = list()
+    estudiante = dict()
+
+    dato_formateado = re.split('\,\s*|\,', dato)
+
+    for x in range(len(encabezados_de_estudiante)):
+
+        if encabezados_de_estudiante[x] == 'padron':
+            estudiante[encabezados_de_estudiante[x]] = validar_numero(dato_formateado[x])
+
+        else:
+            estudiante[encabezados_de_estudiante[x]] = dato_formateado[x]        
+
+    return estudiante
 
 
 def obtener_fecha() -> tuple:
