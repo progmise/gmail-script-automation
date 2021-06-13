@@ -24,6 +24,8 @@ TIME_ZONE = 'America/Argentina/Buenos_Aires'
 
 FORMATO_FECHA_VALIDO = '%d/%m/%Y %H:%M:%S'
 
+ARCHIVO_ALUMNOS = 'Listado Algo I - 202101 - Regulares.csv'
+
 
 def leer_archivo(ruta_de_archivo: str) -> 'list[str]':
 
@@ -145,7 +147,7 @@ def convertir_dato_a_estudiante(dato: str, encabezados_de_estudiante: 'list[str]
     #       parámetro y que ha sido parseada al modelo 'estudiante'
 
     # estudiante = { 
-    #   'padron': int, 
+    #   'legajo': int, 
     #   'nombre': str, 
     #   "apellido": str
     # }
@@ -153,17 +155,37 @@ def convertir_dato_a_estudiante(dato: str, encabezados_de_estudiante: 'list[str]
     dato_formateado = list()
     estudiante = dict()
 
-    dato_formateado = re.split('\,\s*|\,', dato)
+    dato_formateado = re.split('\,\"|\,\s*|\"\,|\,', dato)
+    dato_formateado = dato_formateado[1:4]
 
     for x in range(len(encabezados_de_estudiante)):
 
-        if encabezados_de_estudiante[x] == 'padron':
+        if encabezados_de_estudiante[x] == 'legajo':
             estudiante[encabezados_de_estudiante[x]] = validar_numero(dato_formateado[x])
 
         else:
             estudiante[encabezados_de_estudiante[x]] = dato_formateado[x]        
 
     return estudiante
+
+
+def normalizar_datos_de_estudiantes(datos_no_normalizados: 'list[str]') -> tuple:
+
+    encabezados_de_estudiante = list()
+    datos_de_estudiantes = list()
+
+    encabezados_de_estudiante = datos_no_normalizados[0:1]
+    encabezados_de_estudiante = re.split('\,\s*|\,', encabezados_de_estudiante[0])
+
+    datos_de_estudiantes = datos_no_normalizados[2:]
+    datos_de_estudiantes = [i.title() for i in datos_de_estudiantes]
+
+    encabezados_de_estudiante = encabezados_de_estudiante[1:2]
+    encabezados_de_estudiante = [i.lower() for i in encabezados_de_estudiante]
+    encabezados_de_estudiante.append('apellido')
+    encabezados_de_estudiante.append('nombre')
+
+    return encabezados_de_estudiante, datos_de_estudiantes
 
 
 def obtener_fecha() -> tuple:
@@ -333,6 +355,28 @@ def filtrar_por_fecha_manual(mensajes: 'list[str, dict]', fecha_inicio: str, fec
     return mensajes_filtrados
 
 
+def procesar_informacion_de_entrada() -> 'list[dict]':
+
+    # POST: Devuelve una lista de dicts, que representa a la 
+    #       información procesada del archivo 'ARCHIVO_ALUMNOS'  
+
+    encabezados_de_estudiante = list()
+    datos_de_estudiantes = list()
+    estudiantes = list()
+
+    datos_de_estudiantes = leer_archivo(ARCHIVO_ALUMNOS)
+
+    encabezados_de_estudiante, datos_de_estudiantes = normalizar_datos_de_estudiantes(datos_de_estudiantes)
+
+    for x in range(len(datos_de_estudiantes)):
+
+        estudiantes.append(
+            convertir_dato_a_estudiante(datos_de_estudiantes[x], encabezados_de_estudiante)
+        )
+
+    return estudiantes
+
+
 def listar_mensajes_por_fechas(servicio: Resource, fecha_inicio: str, fecha_hasta) -> 'list[dict]':
 
     mensajes = list()
@@ -383,6 +427,7 @@ def main() -> None:
     fecha_inicio = ''
     fecha_hasta = ''
     mensajes = list()
+    estudiantes = list()
     flag_hay_datos = False
     servicio = obtener_servicio()
 
@@ -392,12 +437,16 @@ def main() -> None:
 
         if opcion == 1:
 
-            fecha_inicio, fecha_hasta = obtener_fechas()
+            #fecha_inicio, fecha_hasta = obtener_fechas()
 
             # mensajes = listar_mensajes_por_fechas(servicio, '08/06/2021 18:00:00', '08/06/2021 21:00:00')
             # mensajes = listar_mensajes_por_fechas(servicio, fecha_inicio, fecha_hasta)
 
             print("\n¡Mensajes procesados!")
+
+            estudiantes = procesar_informacion_de_entrada()
+
+            print("\n¡Estudiantes procesados!")
 
             flag_hay_datos = True
 
