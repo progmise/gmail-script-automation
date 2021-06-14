@@ -9,6 +9,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
 from datetime import datetime
+from base64 import b64decode, urlsafe_b64decode
 
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
@@ -352,6 +353,44 @@ def obtener_encabezado(mensaje: dict, encabezado: str) -> str:
     return asunto
 
 
+def decodificar_archivo_adjunto(archivo: dict, legajo: int) -> dict:
+
+    dato = ''
+
+    extension = re.sub(
+        r'[^\\]*(?=[.][a-zA-Z]+$)', 
+        '', 
+        archivo.get('filename', '')
+    )
+
+    dato = urlsafe_b64decode(archivo.get('data', '').encode('KOI8-U'))
+
+    archivo_decodificado = {
+        'data': dato,
+        'filename': f'{legajo}{extension}'
+    }
+
+    return archivo_decodificado
+
+
+def decodificar_archivos_adjuntos(estudiantes: 'list[dict]') -> None:
+
+    for estudiante in estudiantes:
+
+        archivos_decodificados = list()
+
+        for archivo in estudiante.get('archivos', ''):
+
+            archivo_decodificado = decodificar_archivo_adjunto(
+                archivo, 
+                estudiante.get('legajo', 0)
+            )
+
+            archivos_decodificados.append(archivo_decodificado)
+
+        estudiante['archivos'] = archivos_decodificados
+
+
 def obtener_adjunto(servicio: Resource, id_mensaje: str, id_archivo_adjunto: str) -> dict:
 
     resultado = servicio.users().messages().attachments().get(
@@ -631,6 +670,10 @@ def main() -> None:
             obtener_adjuntos_por_estudiante(servicio, estudiantes)
 
             print("\n¡Se obtuvieron los adjuntos de los estudiantes!")
+
+            decodificar_archivos_adjuntos(estudiantes)
+
+            print("\n¡Adjuntos decodificados!")
 
         elif(opcion == 4 and flag_hay_datos):
             pass
