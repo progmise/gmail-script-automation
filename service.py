@@ -352,6 +352,61 @@ def obtener_encabezado(mensaje: dict, encabezado: str) -> str:
     return asunto
 
 
+def obtener_adjunto(servicio: Resource, id_mensaje: str, id_archivo_adjunto: str) -> dict:
+
+    resultado = servicio.users().messages().attachments().get(
+        userId='me', 
+        messageId=id_mensaje,
+        id=id_archivo_adjunto
+    ).execute()
+
+    return resultado
+
+
+def obtener_adjuntos(servicio: Resource, mensaje: dict) -> 'list[dict]':
+
+    resultados = list()
+    partes = list()
+    archivo_adjunto = dict()
+
+    partes = mensaje.get('payload', '').get('parts', '')[1:]
+
+    for parte in partes:
+
+        id_mensaje = mensaje.get('id', '')
+        id_archivo_adjunto = parte.get('body', '').get('attachmentId', '')
+
+        archivo_adjunto = obtener_adjunto(servicio, id_mensaje, id_archivo_adjunto)
+        archivo_adjunto['filename'] = parte.get('filename', '')
+
+        resultados.append(archivo_adjunto)
+
+    return resultados
+
+
+def obtener_adjuntos_por_estudiante(servicio: Resource, estudiantes: 'list[dict]') -> None:
+
+    archivos = list()
+
+    for estudiante in estudiantes:
+
+        archivos = obtener_adjuntos(servicio, estudiante.get('mensaje', ''))
+
+        estudiante['archivos'] = archivos
+
+        archivo = {
+            'size': estudiante
+                .get('mensaje', '').get('payload', '')
+                .get('parts', '')[0].get('parts', '')[0].get('body', '').get('size', 0),            
+            'data': estudiante
+                .get('mensaje', '').get('payload', '')
+                .get('parts', '')[0].get('parts', '')[0].get('body', '').get('data',''),
+            'filename': '.txt'
+        }
+
+        estudiante.get('archivos', '').append(archivo)
+
+
 def obtener_mensaje(servicio: Resource, mensaje: dict) -> dict:
 
     id_mensaje = mensaje.get('id', '')
@@ -572,7 +627,10 @@ def main() -> None:
             print("\n¡Se relacionaron estudiantes y mensajes!")
 
         elif(opcion == 3 and flag_hay_datos):
-            pass
+            
+            obtener_adjuntos_por_estudiante(servicio, estudiantes)
+
+            print("\n¡Se obtuvieron los adjuntos de los estudiantes!")
 
         elif(opcion == 4 and flag_hay_datos):
             pass
