@@ -141,18 +141,22 @@ def validar_archivos_en_zip(archivo: str) -> 'list[str]':
 
         for nombre_de_archivo in nombres_de_archivos:
 
-            resumen = ''
-            errores = list()
+            nombre_normalizado =  normalizar_nombre_de_archivo(nombre_de_archivo)
 
-            errores = validar_archivo_en_zip(nombre_de_archivo)
+            if nombre_normalizado:
 
-            resumen = ''.join(errores)
+                resumen = ''
+                errores = list()
 
-            if resumen:
+                errores = validar_archivo_en_zip(nombre_normalizado)
 
-                resumen = f'Archivo "{nombre_de_archivo}": {resumen}\n'
+                resumen = ''.join(errores)
 
-                informe_general.append(resumen)
+                if resumen:
+
+                    resumen = f'Archivo "{nombre_normalizado}": {resumen}\n'
+
+                    informe_general.append(resumen)
 
     return informe_general
 
@@ -923,7 +927,7 @@ def main() -> None:
             print("\n¡Archivos guardados!")
 
         elif (opcion == 6):
-            
+
             pass
 
         else:
