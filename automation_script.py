@@ -401,7 +401,7 @@ def generar_informe_de_entregas(estudiantes: 'list[dict]') -> None:
 
     informe = ''
 
-    columnas = ['legajo', 'apellido', 'nombre', 'entregaValida']
+    columnas = ['legajo', 'apellido', 'nombre', 'entregaFormatoValido']
 
     informe += f"{','.join(columnas)}\n"
 
@@ -554,7 +554,7 @@ def actualizar_entregas_e_informes(servicio: Resource, fecha_inicio: str,
     for estudiante in estudiantes:
 
         # Eliminamos los estudiantes que ya entregaron y está OK
-        if estudiante.get('entregaValida', False):
+        if estudiante.get('entregaFormatoValido', False):
 
             indice = buscar_indice_estudiante(estudiantes_actualizados, estudiante.get('legajo', 0))
 
@@ -569,7 +569,7 @@ def actualizar_entregas_e_informes(servicio: Resource, fecha_inicio: str,
         # De aquellos estudiantes con los que contamos con entrega pero no están OK
         # le asignamos los nuevos archivos descargados y eliminamos al mismo de la lista
         # actualizada
-        if not estudiante.get('entregaValida', False):
+        if not estudiante.get('entregaFormatoValido', False):
 
             indice = buscar_indice_estudiante(estudiantes_actualizados, estudiante.get('legajo', 0))
 
@@ -621,7 +621,7 @@ def generar_informe_de_entregas_validas(estudiantes: 'list[dict]') -> None:
 
         if not informe_individual:
 
-            estudiante['entregaValida'] = True
+            estudiante['entregaFormatoValido'] = True
 
             informe_general_entregas_validas += '{0} - {1} {2}: ENTREGA OK\n'.format(
                 estudiante.get('legajo', 0),
@@ -679,7 +679,7 @@ def unir_mensajes_a_estudiantes(estudiantes: 'list[dict]', mensajes: 'list[dict]
 
                 indice += 1
 
-        estudiante['entregaValida'] = False
+        estudiante['entregaFormatoValido'] = False
 
 
 def eliminar_mensajes_mas_viejos(mensajes: 'list[dict]', indices: 'list[int]') -> None:
