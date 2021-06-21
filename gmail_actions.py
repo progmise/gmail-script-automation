@@ -86,17 +86,6 @@ def obtener_servicio() -> Resource:
 def crear_mensaje(remitente: str, destinatario: str, asunto: str, 
                   texto_de_mensaje: str, id_mensaje: str, id_hilo: str) -> dict:
 
-    """Create a message for an email.
-
-    Args:
-        sender: Email address of the sender.
-        to: Email address of the receiver.
-        subject: The subject of the email message.
-        message_text: The text of the email message.
-
-    Returns:
-        An object containing a base64url encoded email object.
-    """
     peticion = dict()
 
     mensaje = MIMEText(texto_de_mensaje)
@@ -131,11 +120,17 @@ def enviar_mensaje(servicio: Resource, mensaje: dict):
 
 def obtener_adjunto(servicio: Resource, id_mensaje: str, id_archivo_adjunto: str) -> dict:
 
-    resultado = servicio.users().messages().attachments().get(
-        userId='me', 
-        messageId=id_mensaje,
-        id=id_archivo_adjunto
-    ).execute()
+    resultado = dict()
+
+    try:
+        resultado = servicio.users().messages().attachments().get(
+            userId='me', 
+            messageId=id_mensaje,
+            id=id_archivo_adjunto
+        ).execute()
+
+    except (HttpError, Error):
+        print(f'Un error ocurrió: {Error}')
 
     return resultado
 
@@ -171,9 +166,17 @@ def obtener_adjuntos(servicio: Resource, mensaje: dict) -> 'list[dict]':
 
 def obtener_mensaje(servicio: Resource, mensaje: dict) -> dict:
 
+    resultado = dict()
     id_mensaje = mensaje.get('id', '')
 
-    resultado = servicio.users().messages().get(userId='me', id=id_mensaje).execute()    
+    try:
+        resultado = servicio.users().messages().get(
+            userId='me', 
+            id=id_mensaje
+        ).execute()
+
+    except (HttpError, Error):
+        print(f'Un error ocurrió: {Error}')         
 
     return resultado
 
@@ -188,12 +191,16 @@ def listar_mensajes_por_fechas(servicio: Resource, fecha_inicio: str, fecha_hast
     segundos_fecha_minimo = mktime(fecha_minimo.timetuple())
     segundos_fecha_maximo = mktime(fecha_maximo.timetuple())
 
-    resultados = servicio.users().messages().list(
-        userId='me',
-        # q=f'after:{segundos_fecha_minimo} before:{segundos_fecha_maximo}'
-        # q='after:2021/06/15 before: 2021/06/16'
-        q='from:leonel.a.cha@gmail.com'
-    ).execute()
+    try:
+        resultados = servicio.users().messages().list(
+            userId='me',
+            # q=f'after:{segundos_fecha_minimo} before:{segundos_fecha_maximo}'
+            # q='after:2021/06/15 before: 2021/06/16'
+            q='from:leonel.a.cha@gmail.com'
+        ).execute()
+
+    except (HttpError, Error):
+        print(f'Un error ocurrió: {Error}')     
 
     ids_mensajes = resultados.get('messages', [])
 
