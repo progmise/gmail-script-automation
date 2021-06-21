@@ -1,15 +1,22 @@
 import os
 
 from googleapiclient.discovery import Resource, build
+from googleapiclient.errors import HttpError, Error
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+
+from email.mime.text import MIMEText
+from base64 import urlsafe_b64encode
 
 from datetime import datetime
 from time import mktime
 from re import findall
 
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.send'
+]
 
 # Archivo generado para la API
 ARCHIVO_SECRET_CLIENT = 'credentials.json'
@@ -76,6 +83,52 @@ def obtener_servicio() -> Resource:
     return build('gmail', 'v1', credentials=generar_credenciales())
 
 
+def crear_mensaje(remitente: str, destinatario: str, asunto: str, 
+                  texto_de_mensaje: str, id_mensaje: str, id_hilo: str) -> dict:
+
+    """Create a message for an email.
+
+    Args:
+        sender: Email address of the sender.
+        to: Email address of the receiver.
+        subject: The subject of the email message.
+        message_text: The text of the email message.
+
+    Returns:
+        An object containing a base64url encoded email object.
+    """
+    peticion = dict()
+
+    mensaje = MIMEText(texto_de_mensaje)
+    mensaje['to'] = destinatario
+    mensaje['from'] = remitente
+    mensaje['subject'] = asunto
+    mensaje['threadId'] = id_hilo
+    mensaje['In-Reply-To'] = id_mensaje
+    mensaje['References'] = id_mensaje
+
+    mensaje_encodeado = urlsafe_b64encode(mensaje.as_string().encode())
+
+    peticion['raw'] = mensaje_encodeado.decode()
+    peticion['threadId'] = id_hilo
+
+    return peticion
+
+
+def enviar_mensaje(servicio: Resource, mensaje: dict):
+
+    try:
+        mensaje = servicio.users().messages().send(
+            userId='me', 
+            body=mensaje
+        ).execute()
+
+    except (HttpError, Error):
+        print(f'Un error ocurrió: {Error}')
+
+    return mensaje
+
+
 def obtener_adjunto(servicio: Resource, id_mensaje: str, id_archivo_adjunto: str) -> dict:
 
     resultado = servicio.users().messages().attachments().get(
@@ -137,7 +190,9 @@ def listar_mensajes_por_fechas(servicio: Resource, fecha_inicio: str, fecha_hast
 
     resultados = servicio.users().messages().list(
         userId='me',
-        q=f'after:2021/06/15 before:2021/06/16'
+        # q=f'after:{segundos_fecha_minimo} before:{segundos_fecha_maximo}'
+        # q='after:2021/06/15 before: 2021/06/16'
+        q='from:leonel.a.cha@gmail.com'
     ).execute()
 
     ids_mensajes = resultados.get('messages', [])
