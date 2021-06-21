@@ -767,6 +767,7 @@ def actualizar_entregas_e_informes(servicio: Resource, fecha_inicio: str,
             if indice != -1:
 
                 estudiante['archivos'] = estudiantes_actualizados[indice].get('archivos', '')
+                estudiante['mensajeEnviado'] = False
 
                 del estudiantes_actualizados[indice]
 
@@ -850,26 +851,32 @@ def generar_informe_de_entregas_validas(servicio: Resource, estudiantes: 'list[d
 
             estudiante['entregaFormatoValido'] = True
 
-            informe_general_entregas_validas += '{0} - {1} {2}: ENTREGA OK\n'.format(
+            informe_individual_entrega_valida = '{0} - {1} {2}: ENTREGA OK\n'.format(
                 estudiante.get('legajo', 0),
                 estudiante.get('apellido', ''),
                 estudiante.get('nombre', '')               
             )
 
-            mensaje = crear_mensaje(
-                obtener_encabezado(estudiante.get('mensaje', ''), 'To'),
-                obtener_encabezado(estudiante.get('mensaje', ''), 'From'),
-                obtener_encabezado(estudiante.get('mensaje', ''), 'Subject'),
-                informe_general_entregas_validas,
-                obtener_encabezado(estudiante.get('mensaje', ''), 'Message-ID'),
-                estudiante.get('mensaje', '').get('threadId', '')
-            )
+            informe_general_entregas_validas += informe_individual_entrega_valida
 
-            enviar_mensaje(servicio, mensaje)
+            if not estudiante.get('mensajeEnviado', False):
+
+                mensaje = crear_mensaje(
+                    obtener_encabezado(estudiante.get('mensaje', ''), 'To'),
+                    obtener_encabezado(estudiante.get('mensaje', ''), 'From'),
+                    obtener_encabezado(estudiante.get('mensaje', ''), 'Subject'),
+                    informe_individual_entrega_valida,
+                    obtener_encabezado(estudiante.get('mensaje', ''), 'Message-ID'),
+                    estudiante.get('mensaje', dict()).get('threadId', '')
+                )
+
+                enviar_mensaje(servicio, mensaje)
+
+                estudiante['mensajeEnviado'] = True
 
         else:
             
-            informe_general_entregas_invalidas += "{0} - {1} {2}: \n".format(
+            informe_individual_entrega_invalida = "{0} - {1} {2}: \n".format(
                 estudiante.get('legajo', 0),
                 estudiante.get('apellido', ''),
                 estudiante.get('nombre', '')
@@ -877,9 +884,25 @@ def generar_informe_de_entregas_validas(servicio: Resource, estudiantes: 'list[d
 
             for error in informe_individual:
 
-                informe_general_entregas_invalidas += f'\t{error}\n'
+                informe_individual_entrega_invalida += f'\t{error}\n'
 
+            informe_general_entregas_invalidas += informe_individual_entrega_invalida
             informe_general_entregas_invalidas += '\n'
+
+            if not estudiante.get('mensajeEnviado', False):
+
+                mensaje = crear_mensaje(
+                    obtener_encabezado(estudiante.get('mensaje', ''), 'To'),
+                    obtener_encabezado(estudiante.get('mensaje', ''), 'From'),
+                    obtener_encabezado(estudiante.get('mensaje', ''), 'Subject'),
+                    informe_individual_entrega_invalida,
+                    obtener_encabezado(estudiante.get('mensaje', ''), 'Message-ID'),
+                    estudiante.get('mensaje', dict()).get('threadId', '')
+                )
+
+                enviar_mensaje(servicio, mensaje)
+
+                estudiante['mensajeEnviado'] = True            
 
     escribir_archivo('entregas_invalidas.txt', informe_general_entregas_invalidas)
     escribir_archivo('entregas_validas.txt', informe_general_entregas_validas)
@@ -918,6 +941,7 @@ def unir_mensajes_a_estudiantes(estudiantes: 'list[dict]', mensajes: 'list[dict]
                 indice += 1
 
         estudiante['entregaFormatoValido'] = False
+        estudiante['mensajeEnviado'] = False
 
 
 def eliminar_mensajes_mas_viejos(mensajes: 'list[dict]', indices: 'list[int]') -> None:
