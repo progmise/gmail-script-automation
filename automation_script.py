@@ -8,10 +8,13 @@ from random import randint
 from googleapiclient.discovery import Resource
 
 from gmail_actions import obtener_servicio
-from gmail_actions import obtener_adjuntos, listar_mensajes_por_fechas
+from gmail_actions import listar_mensajes_por_fechas, obtener_adjuntos
+from gmail_actions import crear_mensaje, enviar_mensaje
 
 from datetime import datetime
 from zipfile import ZipFile, BadZipFile
+from py7zr import SevenZipFile, Bad7zFile
+from unrar.rarfile import RarFile, BadRarFile
 from io import BytesIO
 
 
@@ -57,6 +60,56 @@ def escribir_archivo(ruta_de_archivo: str, contenido: str) -> None:
 
     finally:
         archivo.close()      
+
+
+def escribir_archivo_binario(ruta_de_archivo: str, contenido: str) -> None:
+
+    archivo_bytes = BytesIO(contenido)
+
+    objetivo = open(ruta_de_archivo, 'wb') 
+
+    try:
+        with archivo_bytes, objetivo:
+
+            shutil.copyfileobj(archivo_bytes, objetivo)      
+
+    except IOError:
+        print('\nNo se pudo escribir el archivo: ', ruta_de_archivo)
+
+    finally:
+        objetivo.close()         
+
+
+def eliminar_archivos_temporales(nombre_de_directorio: str) -> None:
+
+    for archivos in os.listdir(nombre_de_directorio):
+
+        ruta_de_archivo = os.path.join(nombre_de_directorio, archivos)
+
+        try:
+            shutil.rmtree(ruta_de_archivo)
+
+        except OSError:
+            os.remove(ruta_de_archivo)    
+
+
+def obtener_lista_de_archivos(nombre_de_directorio: str) -> 'list[str]':
+
+    archivos = os.listdir(nombre_de_directorio)
+    todos_los_archivos = list()
+
+    for entrada in archivos:
+
+        ruta_completa = os.path.join(nombre_de_directorio, entrada)
+
+        if os.path.isdir(ruta_completa):
+
+            todos_los_archivos = todos_los_archivos + obtener_lista_de_archivos(ruta_completa)
+        else:
+
+            todos_los_archivos.append(ruta_completa)
+                
+    return todos_los_archivos
 
 
 def obtener_encabezado(mensaje: dict, encabezado: str) -> str:
@@ -127,9 +180,101 @@ def validar_archivo_en_zip(nombre_de_archivo: str) -> 'list[str]':
     return errores
 
 
+def validar_archivos_en_7z(archivo: str) -> 'list[str]':
+
+    informe_general = list()
+    nombres_de_archivos = list()
+
+    dato = urlsafe_b64decode(archivo.encode('KOI8-U'))
+
+    archivo_bytes = BytesIO(dato)
+
+    with SevenZipFile(archivo_bytes) as archivo_7z:
+
+        archivo_7z.extractall(path='tmp\\')
+
+        nombres_de_archivos = obtener_lista_de_archivos('tmp\\')
+
+        if nombres_de_archivos:
+
+            for nombre_de_archivo in nombres_de_archivos:
+
+                resumen = ''
+                errores = list()
+
+                nombre_normalizado =  normalizar_nombre_de_archivo(nombre_de_archivo)
+
+                errores = validar_archivo_en_zip(nombre_normalizado)
+
+                resumen = ''.join(errores)
+
+                if resumen:
+
+                    resumen = f'Archivo "{nombre_normalizado}": {resumen}\n'
+
+                    informe_general.append(resumen)    
+
+        else:
+
+            resumen = f'No hay archivos adjuntos o es una carpeta vacía\n'
+
+            informe_general.append(resumen)
+
+    eliminar_archivos_temporales('tmp\\')
+
+    return informe_general
+
+
+def validar_archivos_en_rar(archivo: str, nombre_de_comprimido: str) -> 'list[str]':
+    
+    informe_general = list()
+    nombres_de_archivos = list()
+
+    dato = urlsafe_b64decode(archivo.encode('KOI8-U'))
+
+    escribir_archivo_binario(f'tmp\\{nombre_de_comprimido}', dato)
+
+    with RarFile(f"tmp\\{nombre_de_comprimido}") as archivo_rar:
+
+        archivo_rar.extractall(path='tmp\\')
+
+        os.remove(f"tmp\\{nombre_de_comprimido}")
+
+        nombres_de_archivos = obtener_lista_de_archivos('tmp\\')
+
+        if nombres_de_archivos:
+
+            for nombre_de_archivo in nombres_de_archivos:
+
+                resumen = ''
+                errores = list()
+
+                nombre_normalizado =  normalizar_nombre_de_archivo(nombre_de_archivo)
+
+                errores = validar_archivo_en_zip(nombre_normalizado)
+
+                resumen = ''.join(errores)
+
+                if resumen:
+
+                    resumen = f'Archivo "{nombre_normalizado}": {resumen}\n'
+
+                    informe_general.append(resumen)    
+
+        else:
+
+            resumen = f'No hay archivos adjuntos o es una carpeta vacía\n'
+
+            informe_general.append(resumen)
+
+    eliminar_archivos_temporales('tmp\\')
+
+    return informe_general
+
+
 def validar_archivos_en_zip(archivo: str) -> 'list[str]':
 
-    informe_general = []
+    informe_general = list()
 
     dato = urlsafe_b64decode(archivo.encode('KOI8-U'))
 
@@ -422,11 +567,55 @@ def normalizar_nombre_de_archivo(nombre_de_archivo: str) -> str:
 
     if extension:
 
-        partes = nombre_de_archivo.split('/')
+        partes = split(r'/|\\', nombre_de_archivo)
 
         nombre_normalizado = partes[len(partes) - 1]
 
     return nombre_normalizado
+
+
+def desempaquetar_archivo_7z(carpeta: str, archivo: str) -> None:
+
+    dato = urlsafe_b64decode(archivo.encode('KOI8-U'))
+
+    archivo_bytes = BytesIO(dato)
+
+    with SevenZipFile(archivo_bytes) as archivo_7z:
+
+        archivo_7z.extractall(path='tmp\\')
+
+        nombres_de_archivos = obtener_lista_de_archivos('tmp\\')
+
+        for nombre_de_archivo in nombres_de_archivos:
+
+            nombre_normalizado =  normalizar_nombre_de_archivo(nombre_de_archivo)
+
+            shutil.move(nombre_de_archivo, f'{carpeta}\\{nombre_normalizado}')
+
+    eliminar_archivos_temporales('tmp\\')
+
+
+def desempaquetar_archivo_rar(carpeta: str, nombre_de_comprimido: str, archivo: str):
+
+    dato = urlsafe_b64decode(archivo.encode('KOI8-U'))
+
+    escribir_archivo_binario(f'tmp\\{nombre_de_comprimido}', dato)
+
+    with RarFile(f"tmp\\{nombre_de_comprimido}") as archivo_rar:
+
+        archivo_rar.extractall(path='tmp\\')
+
+        os.remove(f"tmp\\{nombre_de_comprimido}")
+
+        nombres_de_archivos = obtener_lista_de_archivos('tmp\\')
+
+        for nombre_de_archivo in nombres_de_archivos:
+
+            nombre_normalizado =  normalizar_nombre_de_archivo(nombre_de_archivo)
+
+            shutil.move(nombre_de_archivo, f'{carpeta}\\{nombre_normalizado}')
+
+    eliminar_archivos_temporales('tmp\\')
 
 
 def desempaquetar_archivo_zip(carpeta: str, archivo: str) -> None:
@@ -458,7 +647,7 @@ def desempaquetar_archivo_zip(carpeta: str, archivo: str) -> None:
                     objetivo.close()                        
 
 
-def guardar_comprimido(extension: str, carpeta: str, nombre_de_archivo: str, dato: str) -> None:
+def guardar_comprimido(extension: str, carpeta: str, nombre_de_comprimido: str, dato: str) -> None:
 
     if extension in EXTENSIONES_DE_COMPRESION:
 
@@ -469,18 +658,20 @@ def guardar_comprimido(extension: str, carpeta: str, nombre_de_archivo: str, dat
                 desempaquetar_archivo_zip(carpeta, dato)
 
             elif extension == '.rar':
-                pass
+                
+                desempaquetar_archivo_rar(carpeta, nombre_de_comprimido, dato)
 
-            elif extension == '7z':
-                pass  
+            elif extension == '.7z':
+                
+                desempaquetar_archivo_7z(carpeta, dato)
             
-        except BadZipFile:
+        except (BadZipFile, BadRarFile, Bad7zFile):
             
             archivo = urlsafe_b64decode(dato.encode('KOI8-U'))
 
             archivo_bytes = BytesIO(archivo)      
 
-            objetivo = open(f'{carpeta}\\{nombre_de_archivo}', 'wb') 
+            objetivo = open(f'{carpeta}\\{nombre_de_comprimido}', 'wb') 
 
             with archivo_bytes, objetivo:
 
@@ -581,10 +772,10 @@ def actualizar_entregas_e_informes(servicio: Resource, fecha_inicio: str,
 
     estudiantes += estudiantes_actualizados
 
-    generar_informe_de_entregas_validas(estudiantes)
+    generar_informe_de_entregas_validas(servicio, estudiantes)
 
 
-def generar_informe_de_entregas_validas(estudiantes: 'list[dict]') -> None:
+def generar_informe_de_entregas_validas(servicio: Resource, estudiantes: 'list[dict]') -> None:
 
     informe_general_entregas_invalidas = ''
     informe_general_entregas_validas = ''
@@ -608,14 +799,50 @@ def generar_informe_de_entregas_validas(estudiantes: 'list[dict]') -> None:
                         estudiante.get('archivos', '')[0].get('filename', ''),
                         '\n\t\tSe cambió la extensión, no es un .zip'
                     )
-                )                
+                )
+
+        elif estudiante.get('archivos', '')[0].get('extension') == '.rar':
+
+            try:
+
+                informe_individual = validar_archivos_en_rar(
+                    estudiante.get('archivos', '')[0].get('data', ''),
+                    estudiante.get('archivos', '')[0].get('filename', '')
+                )
+
+            except BadRarFile:
+
+                informe_individual.append('Archivo "{0}": {1}\n'
+                    .format(
+                        estudiante.get('archivos', '')[0].get('filename', ''),
+                        '\n\t\tSe cambió la extensión, no es un .rar'
+                    )
+                )                                
+
+        elif estudiante.get('archivos', '')[0].get('extension') == '.7z':
+
+            try:
+
+                informe_individual = validar_archivos_en_7z(
+                    estudiante.get('archivos', '')[0].get('data', '')
+                )
+
+            except Bad7zFile:
+
+                informe_individual.append('Archivo "{0}": {1}\n'
+                    .format(
+                        estudiante.get('archivos', '')[0].get('filename', ''),
+                        '\n\t\tSe cambió la extensión, no es un .7z'
+                    )
+                )  
 
         else:
 
-            informe_individual.append('Archivo "{0}": {1}\n'
+            informe_individual.append('Archivo "{0}": {1} {2}\n'
                 .format(
                     estudiante.get('archivos', '')[0].get('filename', ''),
-                    '\n\t\tNo es un archivo comprimido .zip'
+                    '\n\t\tNo es un archivo comprimido',
+                    estudiante.get('archivos', '')[0].get('extension', '')
                 )
             )
 
@@ -628,6 +855,17 @@ def generar_informe_de_entregas_validas(estudiantes: 'list[dict]') -> None:
                 estudiante.get('apellido', ''),
                 estudiante.get('nombre', '')               
             )
+
+            mensaje = crear_mensaje(
+                obtener_encabezado(estudiante.get('mensaje', ''), 'To'),
+                obtener_encabezado(estudiante.get('mensaje', ''), 'From'),
+                obtener_encabezado(estudiante.get('mensaje', ''), 'Subject'),
+                informe_general_entregas_validas,
+                obtener_encabezado(estudiante.get('mensaje', ''), 'Message-ID'),
+                estudiante.get('mensaje', '').get('threadId', '')
+            )
+
+            enviar_mensaje(servicio, mensaje)
 
         else:
             
@@ -872,6 +1110,8 @@ def main() -> None:
 
     servicio = obtener_servicio()
 
+    os.makedirs('tmp', exist_ok=True)
+
     while opcion != 7:
 
         if opcion == 1:
@@ -896,7 +1136,7 @@ def main() -> None:
             if not flag_primera_descarga:
 
                 obtener_adjuntos_por_estudiante(servicio, estudiantes)
-                generar_informe_de_entregas_validas(estudiantes)
+                generar_informe_de_entregas_validas(servicio, estudiantes)
 
                 flag_primera_descarga = True
 
@@ -935,6 +1175,8 @@ def main() -> None:
             print("\n¡Debes procesar información primero, antes de elegir esa opción!")
 
         opcion = obtener_entrada_usuario(opciones)
+
+    os.rmdir('tmp\\')
 
     print("\nPrograma finalizado")
 
