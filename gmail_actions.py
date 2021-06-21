@@ -141,12 +141,12 @@ def obtener_adjuntos(servicio: Resource, mensaje: dict) -> 'list[dict]':
     partes = list()
     archivo_adjunto = dict()
 
-    partes = mensaje.get('payload', '').get('parts', '')[1:]
+    partes = mensaje.get('payload', dict()).get('parts', [])[1:]
 
     for parte in partes:
 
         id_mensaje = mensaje.get('id', '')
-        id_archivo_adjunto = parte.get('body', '').get('attachmentId', '')
+        id_archivo_adjunto = parte.get('body', dict()).get('attachmentId', '')
 
         archivo_adjunto = obtener_adjunto(servicio, id_mensaje, id_archivo_adjunto)
         archivo_adjunto['filename'] = parte.get('filename', '')
