@@ -1,5 +1,6 @@
 import os
 import shutil
+import csv
 
 from re import sub, split, findall
 from base64 import urlsafe_b64decode
@@ -20,7 +21,7 @@ from io import BytesIO
 
 FORMATO_FECHA_VALIDO = '%d/%m/%Y %H:%M:%S'
 
-ARCHIVO_ALUMNOS = 'Listado Algo I - 202101 - Regulares.csv'
+ARCHIVO_ALUMNOS = 'Listado Algo I - 202102 - Regulares.csv'
 
 EXTENSIONES_DE_COMPRESION = ['.zip', '.rar', '.7z']
 
@@ -121,12 +122,14 @@ def obtener_encabezado(mensaje: dict, encabezado: str) -> str:
         'X-Gm-Message-State', 'X-Google-Smtp-Source', 'X-Received', 'MIME-Version', 
         'From', 'Date', 'Message-ID', 'Subject', 'To', 'Content-Type'
     '''
-
+    asunto = ''
     encabezados = mensaje.get('payload', '').get('headers', '')
 
     encabezado = [d for d in encabezados if d.get('name', '') == encabezado]
 
-    asunto = encabezado[0].get('value', '')    
+    if encabezado:
+
+        asunto = encabezado[0].get('value', '')     
 
     return asunto
 
@@ -464,9 +467,9 @@ def obtener_entrada_usuario(opciones: list) -> int:
 def asignar_correctores_a_alumnos() -> 'list[dict]':
 
     datos = [
-        'Ariadna Cattaneo', 'Aylen Reynoso', 'Bruno Lanzillota', 
+        'Ariadna Cattaneo', 'Bruno Lanzillota', 
         'Carolina Di Matteo', 'Daniela Palacios', 'Franco Capra',
-        'Franco Lucchesi', 'Guido Costa', "Lautaro D'Abbracio", 
+        'Franco Lucchesi', 'Guido Costa', "Lautaro D'Abbraccio", 
         'Leonel Chaves', 'Martín Sosa', 'Ramiro Esperon',
         'Tomas Villegas'
     ]
@@ -785,7 +788,7 @@ def generar_informe_de_entregas_validas(servicio: Resource, estudiantes: 'list[d
 
         informe_individual = list()
 
-        if estudiante.get('archivos', '')[0].get('extension') == '.zip':
+        if estudiante.get('archivos', [])[0].get('extension') == '.zip':
 
             try:
 
@@ -914,7 +917,7 @@ def obtener_adjuntos_por_estudiante(servicio: Resource, estudiantes: 'list[dict]
 
     for estudiante in estudiantes:
 
-        archivos = obtener_adjuntos(servicio, estudiante.get('mensaje', ''))
+        archivos = obtener_adjuntos(servicio, estudiante.get('mensaje', dict()))
 
         estudiante['archivos'] = archivos
 
@@ -926,7 +929,7 @@ def unir_mensajes_a_estudiantes(estudiantes: 'list[dict]', mensajes: 'list[dict]
         indice = 0
         flag_se_agrego_mensaje = False
 
-        while not flag_se_agrego_mensaje:
+        while not flag_se_agrego_mensaje and indice < len(mensajes):
 
             if estudiante.get('legajo', 0) == mensajes[indice].get('legajo', 0):
 
@@ -974,6 +977,21 @@ def obtener_duplicados_por_legajo(mensajes: 'list[dict]') -> dict:
     return mensajes_no_unicos_por_legajo
 
 
+def limpiar_mensajes_sin_adjunto(mensajes: 'list[dict]') -> None:
+
+    for i in range(len(mensajes) - 1, -1, -1):
+
+        partes = mensajes[i].get('payload', '').get('parts', '')[1:]
+
+        for parte in partes:
+
+            id_archivo_adjunto = parte.get('body', '').get('attachmentId', '')
+
+            if not id_archivo_adjunto:
+
+                del mensajes[i]
+
+
 def limpiar_mensajes(mensajes: 'list[dict]') -> None:
 
     mensajes_no_unicos_por_legajo = dict()
@@ -995,6 +1013,8 @@ def limpiar_mensajes(mensajes: 'list[dict]') -> None:
                 mensajes, 
                 list(mensajes_no_unicos_por_legajo.values())[0][1]
             )
+
+    limpiar_mensajes_sin_adjunto(mensajes)
 
 
 def limpiar_estudiantes(mensajes: 'list[dict]', estudiantes: 'list[dict]') -> None:
@@ -1020,21 +1040,6 @@ def limpiar_estudiantes(mensajes: 'list[dict]', estudiantes: 'list[dict]') -> No
     legajos_unicos = set(legajos)
 
     estudiantes[:] = [i for i in estudiantes if i.get('legajo', 0) in legajos_unicos]
-
-
-def limpiar_mensajes_sin_adjunto(mensajes: 'list[dict]') -> None:
-
-    for i in range(len(mensajes) - 1, 0, -1):
-
-        partes = mensajes[i].get('payload', '').get('parts', '')[1:]
-
-        for parte in partes:
-
-            id_archivo_adjunto = parte.get('body', '').get('attachmentId', '')
-
-            if not id_archivo_adjunto:
-
-                del mensajes[i]
 
 
 def convertir_dato_a_estudiante(dato: str, encabezados_de_estudiante: 'list[str]') -> dict:
@@ -1074,10 +1079,11 @@ def normalizar_datos_de_estudiantes(datos_no_normalizados: 'list[str]') -> tuple
     encabezados_de_estudiante = list()
     datos_de_estudiantes = list()
 
-    encabezados_de_estudiante = datos_no_normalizados[0:1]
+    encabezados_de_estudiante = datos_no_normalizados[1:2]
     encabezados_de_estudiante = split('\,\s*|\,', encabezados_de_estudiante[0])
 
     datos_de_estudiantes = datos_no_normalizados[2:]
+    datos_de_estudiantes.pop(-1)
     datos_de_estudiantes = [i.title() for i in datos_de_estudiantes]
 
     encabezados_de_estudiante = encabezados_de_estudiante[1:2]
@@ -1110,6 +1116,36 @@ def procesar_informacion_de_entrada() -> 'list[dict]':
     return estudiantes
 
 
+def obtener_correctores() -> 'list[dict]':
+    file = open('asignacion_de_correctores.csv', encoding='utf-8')
+
+    csv_reader = csv.reader(file)
+
+    datos_no_normalizados = list(csv_reader)
+
+    datos_no_normalizados.pop(0)
+
+    correctores = [x[3] for x in datos_no_normalizados]
+
+    correctores_unicos = set(correctores)
+
+    correctores = list()
+
+    for nombre in correctores_unicos:
+
+        corrector = dict()
+
+        corrector['corrector'] = nombre
+
+        estudiantes = [x[0] for x in datos_no_normalizados if x[3] == nombre]
+
+        corrector['estudiantes'] = [int(x) for x in estudiantes]
+
+        correctores.append(corrector)    
+
+    return correctores
+
+
 #TODO: Eliminar mensajes sin attachementId, o sea, que no enviaron archivo adjunto
 def main() -> None:
 
@@ -1136,17 +1172,19 @@ def main() -> None:
 
     os.makedirs('tmp', exist_ok=True)
 
+    opcion = obtener_entrada_usuario(opciones)
+
     while opcion != 7:
 
         if opcion == 1:
 
             # fecha_inicio, fecha_hasta = obtener_fechas()
 
-            mensajes = listar_mensajes_por_fechas(servicio, '15/06/2021 17:00:00', '15/06/2021 21:10:00')
+            mensajes = listar_mensajes_por_fechas(servicio, '02/12/2021 20:30:00', '02/12/2021 21:00:00')
             # mensajes = listar_mensajes_por_fechas(servicio, fecha_inicio, fecha_hasta)
 
             estudiantes = procesar_informacion_de_entrada()
-
+            
             limpiar_estudiantes(mensajes, estudiantes)
             limpiar_mensajes(mensajes)
             unir_mensajes_a_estudiantes(estudiantes, mensajes)
@@ -1181,6 +1219,7 @@ def main() -> None:
         elif (opcion == 4 and flag_hay_datos):
             
             correctores = asignar_correctores_a_alumnos()
+            #correctores = obtener_correctores()
 
             print("\n¡Correctores asignados!")
 

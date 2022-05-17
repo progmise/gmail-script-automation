@@ -146,6 +146,12 @@ def obtener_adjuntos(servicio: Resource, mensaje: dict) -> 'list[dict]':
     for parte in partes:
 
         id_mensaje = mensaje.get('id', '')
+        '''
+        try:
+            id_archivo_adjunto = parte.get('body', dict()).get('attachmentId', '')
+        except:
+            print("Ocurrio un error")
+        '''
         id_archivo_adjunto = parte.get('body', dict()).get('attachmentId', '')
 
         archivo_adjunto = obtener_adjunto(servicio, id_mensaje, id_archivo_adjunto)
@@ -188,15 +194,16 @@ def listar_mensajes_por_fechas(servicio: Resource, fecha_inicio: str, fecha_hast
     fecha_minimo = datetime.strptime(fecha_inicio, FORMATO_FECHA_VALIDO)
     fecha_maximo = datetime.strptime(fecha_hasta, FORMATO_FECHA_VALIDO)   
 
-    segundos_fecha_minimo = mktime(fecha_minimo.timetuple())
-    segundos_fecha_maximo = mktime(fecha_maximo.timetuple())
+    segundos_fecha_minimo = int(mktime(fecha_minimo.timetuple()))
+    segundos_fecha_maximo = int(mktime(fecha_maximo.timetuple()))
 
     try:
         resultados = servicio.users().messages().list(
             userId='me',
-            # q=f'after:{segundos_fecha_minimo} before:{segundos_fecha_maximo}'
-            # q='after:2021/06/15 before: 2021/06/16'
-            q='from:leonel.a.cha@gmail.com'
+
+            q=f'after:{segundos_fecha_minimo} before:{segundos_fecha_maximo}'
+            # q='after:2021/08/03 before:2021/08/04'
+            # q='from:leonel.a.cha@gmail.com'
         ).execute()
 
     except (HttpError, Error):
